@@ -1,0 +1,48 @@
+
+액츄에이터 & 센서 수량(인스턴스 기준)
+센서
+PCF8575DI 1개
+
+ServoModbusNode 1개
+
+DCBottleGripper 2개(전면, 후면)
+    DIR_PIN = 4 #Front Bottle Grip 
+    EN_PIN  = 5
+    sensor_name="S11_front_bottle_grip",
+    sensor_name="S12_front_bottle_release",
+
+    DIR_PIN = 6 #Rear Bottle Grip 
+    EN_PIN  = 7
+    sensor_name="S13_rear_bottle_grip",
+    sensor_name="S14_rear_bottle_release",
+
+DCConveyor 1개
+    DIR_PIN = 2
+    EN_PIN  = 3
+
+DCLiftMotor 1개
+    DIR_PIN = 8
+    EN_PIN  = 9
+
+=== FSM ===
+0. 개시 입력 input()으로 일단 처리
+
+1. 리프트 hi
+2. 전면 보틀 릴리즈(병이 콘베어에 놓임)
+3. 리프트 mid
+4. 전면 보틀그립
+5. 리프트 lo 
+6. drop 입력 대기 - input()으로 일단 처리
+7. drop one
+8. 병 남았으면 6으로, 없으면 0.5초 대기후 9로
+9. 서보 280mm Forward
+
+11. 리프트 hi
+12. 후면 보틀 릴리즈(병이 콘베어에 놓임)
+13. 리프트 mid
+14. 후면 보틀그립
+15. 리프트 lo
+16. 서보 280mm Reverse
+17. drop 입력 대기 - input()으로 일단 처리
+18. drop one
+19. 병 남았으면 17로, 없으면 0.5초 대기후 1로
