@@ -121,18 +121,3 @@ NODE_C
 NODE_C1
 의 gpio0~15  기능을 코드 상에서 파악 해서 control.md로 저장해줘
 
-
-
-control.md내용 수정
-런타임 코드에서 초기화되지 않습니다. ==> 제거
-active-low이며 기본적으로 enable 상태로 둡니다. ==> 제거
-active-low pulse ==> 구체적 설명 제거
-
-
-
-
-sensor.md내용 수정
-현재 런타임 로직에서는 참조되지 않습니다. ==> 예비용
-센서로 보입니다 ==> 센서
-
-
