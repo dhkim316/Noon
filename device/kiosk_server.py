@@ -8,6 +8,7 @@ from typing import Any, Dict, Optional
 
 HOST = "0.0.0.0"
 PORT = 8001
+TERMINAL_STATE_TIMEOUT_S = 120
 
 class KioskServer:
     def __init__(self) -> None:
@@ -100,7 +101,7 @@ class KioskServer:
             time.sleep(0.05)
         raise TimeoutError(f"Timeout waiting response for req id={req_id}")
 
-    def wait_for_terminal_state(self, req_id: str, timeout_sec: float = 60.0) -> str:
+    def wait_for_terminal_state(self, req_id: str, timeout_sec: float = TERMINAL_STATE_TIMEOUT_S) -> str:
         deadline = time.time() + timeout_sec
         while time.time() < deadline and self.running:
             with self.pending_lock:

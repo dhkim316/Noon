@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import argparse
 import json
 import socket
 import threading
@@ -8,6 +9,14 @@ from typing import Any, Dict
 
 SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 8001
+RETRY_INTERVAL_SEC = 0.3
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="MiniPC client")
+    parser.add_argument("host", nargs="?", default=SERVER_HOST, help=f"Kiosk server host (default: {SERVER_HOST})")
+    parser.add_argument("port", nargs="?", type=int, default=SERVER_PORT, help=f"Kiosk server port (default: {SERVER_PORT})")
+    return parser.parse_args()
 
 
 class MiniPCClient:
@@ -19,6 +28,23 @@ class MiniPCClient:
         self.running = True
         self.evt_seq = 2000
         self.send_lock = threading.Lock()
+
+    def close_connection(self) -> None:
+        try:
+            if self.sock_file:
+                self.sock_file.close()
+        except OSError:
+            pass
+        finally:
+            self.sock_file = None
+
+        try:
+            if self.sock:
+                self.sock.close()
+        except OSError:
+            pass
+        finally:
+            self.sock = None
 
     def next_evt_id(self) -> str:
         self.evt_seq += 1
@@ -59,7 +85,7 @@ class MiniPCClient:
 
     def wait_for_go_or_stop(self, job_id: str) -> bool:
         while True:
-            user_input = input(f"[INPUT] job={job_id} next action (go/stop): ").strip().lower()
+            user_input = input(f"[INPUT] job={job_id} wait for print (go/stop): ").strip().lower()
             if user_input == "go":
                 return True
             if user_input == "stop":
@@ -111,47 +137,48 @@ class MiniPCClient:
         self.resp(msg, code="NOT_SUPPORTED", detail="unsupported command")
 
     def run(self) -> None:
-        self.sock = socket.create_connection((self.host, self.port), timeout=10)
-        self.sock.settimeout(None)
-        self.sock_file = self.sock.makefile("r", encoding="utf-8", newline="\n")
-        print(f"[INFO] Connected to kiosk server {self.host}:{self.port}")
-
         try:
             while self.running:
-                line = self.sock_file.readline()
-                if not line:
-                    print("[INFO] Server closed connection.")
-                    break
-                line = line.strip()
-                if not line:
-                    continue
-                print(f"[RX] {line}")
                 try:
-                    msg = json.loads(line)
-                except json.JSONDecodeError:
-                    print(f"[WARN] Invalid JSON: {line}")
-                    continue
+                    self.sock = socket.create_connection((self.host, self.port), timeout=10)
+                    self.sock.settimeout(None)
+                    self.sock_file = self.sock.makefile("r", encoding="utf-8", newline="\n")
+                    print(f"[INFO] Connected to kiosk server {self.host}:{self.port}")
 
-                if msg.get("type") == "req":
-                    self.handle_req(msg)
-        except (OSError, KeyboardInterrupt) as exc:
-            print(f"[INFO] Client stop: {exc}")
+                    while self.running:
+                        line = self.sock_file.readline()
+                        if not line:
+                            print("[INFO] Server closed connection. Retrying...")
+                            break
+                        line = line.strip()
+                        if not line:
+                            continue
+                        print(f"[RX] {line}")
+                        try:
+                            msg = json.loads(line)
+                        except json.JSONDecodeError:
+                            print(f"[WARN] Invalid JSON: {line}")
+                            continue
+
+                        if msg.get("type") == "req":
+                            self.handle_req(msg)
+                except KeyboardInterrupt:
+                    print("[INFO] Client stop: interrupted by user")
+                    self.running = False
+                except OSError as exc:
+                    print(f"[INFO] Connect/read failed: {exc}. Retrying in {RETRY_INTERVAL_SEC:.1f}s...")
+                finally:
+                    self.close_connection()
+
+                if self.running:
+                    time.sleep(RETRY_INTERVAL_SEC)
         finally:
-            self.running = False
-            try:
-                if self.sock_file:
-                    self.sock_file.close()
-            except OSError:
-                pass
-            try:
-                if self.sock:
-                    self.sock.close()
-            except OSError:
-                pass
+            self.close_connection()
 
 
 def main() -> None:
-    client = MiniPCClient(SERVER_HOST, SERVER_PORT)
+    args = parse_args()
+    client = MiniPCClient(args.host, args.port)
     client.run()
 
 
